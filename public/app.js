@@ -59,8 +59,10 @@ function renderLoading(query) {
   resultEl.replaceChildren(h('p', { class: 'loading' }, `「${query}」を照会しています…`));
 }
 
-// 診断情報: 検索APIの応答の形を表示する(うまく見つからないときの原因調べ用)
+// 診断情報: OpenXBL から受け取った応答をすべてそのまま表示する(原因調べ用)
 function renderDiagnostics(query) {
+  const params = new URLSearchParams({ gamertag: query, debug: '1' });
+  const apiUrl = `/api/lookup?${params}`;
   const box = h('div', { class: 'diagnostics' });
   const button = h('button', {
     type: 'button',
@@ -69,15 +71,32 @@ function renderDiagnostics(query) {
       button.disabled = true;
       button.textContent = '診断情報を取得中…';
       try {
-        const params = new URLSearchParams({ gamertag: query, debug: '1' });
-        const res = await fetch(`/api/lookup?${params}`, { headers: { Accept: 'application/json' } });
-        const data = await res.json().catch(() => null);
-        const view = data
-          ? { status: res.status, searchedAs: data.searchedAs, found: data.found, error: data.error, debug: data.debug }
-          : { status: res.status, note: 'JSONではない応答でした' };
+        const res = await fetch(apiUrl, { headers: { Accept: 'application/json' } });
+        const text = await res.text();
+        let pretty = text;
+        try {
+          pretty = JSON.stringify(JSON.parse(text), null, 2);
+        } catch {
+          // JSON でなければそのまま
+        }
+        const copy = h('button', {
+          type: 'button',
+          class: 'text-link',
+          onclick: async () => {
+            try {
+              await navigator.clipboard.writeText(pretty);
+              copy.textContent = 'コピーしました';
+            } catch {
+              copy.textContent = 'コピーできませんでした。下の枠から選択してください';
+            }
+          },
+        }, '全文をコピー');
         box.replaceChildren(
-          h('p', {}, '内容をコピーして共有すると、原因を調べやすくなります。'),
-          h('pre', {}, JSON.stringify(view, null, 2)));
+          h('p', {}, `HTTP ${res.status}。「raw」にOpenXBLから受け取った応答がすべて入っています。検索結果にはほかのプレイヤーの名前も含まれるので、共有するときは注意してください。`),
+          h('div', { class: 'diagnostics-actions' },
+            copy,
+            h('a', { class: 'text-link', href: apiUrl, target: '_blank', rel: 'noopener' }, '別のタブで開く')),
+          h('pre', {}, pretty));
       } catch {
         box.replaceChildren(h('p', {}, '診断情報を取得できませんでした。'));
       }
@@ -258,6 +277,7 @@ function renderFound(data) {
     renderBreakdown(data),
     renderTitles(data),
     renderMeta(data),
+    renderDiagnostics(data.query),
   ].filter(Boolean));
 }
 

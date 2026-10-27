@@ -119,6 +119,8 @@ function fakeClient(overrides = {}) {
     getAccount: async () => ({ profileUsers: [{ id: '42', settings: [{ id: 'Gamerscore', value: '3500' }, { id: 'XboxOneRep', value: 'GoodPlayer' }] }] }),
     getTitles: async () => ({ titles: [mcTitle('1828326430', 'Minecraft', 40, 133, 900, '2026-10-01T00:00:00Z')] }),
     getStats: async () => ({ statlistscollection: [{ stats: [{ name: 'MinutesPlayed', titleid: '1828326430', value: '3600' }] }] }),
+    getTitleHistory: async () => ({ titles: [] }),
+    getTitleAchievements: async () => ({ achievements: [] }),
     ...overrides,
   };
   const wrapped = {};
@@ -152,6 +154,9 @@ test('lookupGamertag: 見つからない', async () => {
 test('lookupGamertag: 履歴が非公開なら判定不能', async () => {
   const client = fakeClient({
     getTitles: async () => {
+      throw new OpenXblError(403, 'forbidden');
+    },
+    getTitleHistory: async () => {
       throw new OpenXblError(403, 'forbidden');
     },
   });
@@ -265,4 +270,68 @@ test('lookupGamertag: 「名前番号」で見つからなければ名前で再�
   assert.equal(r.profile.xuid, '202');
   assert.deepEqual(terms, ['sirokuru4202', 'sirokuru']);
   assert.deepEqual(r.searchedAs, ['sirokuru4202', 'sirokuru']);
+});
+
+// ---- 応答の形の違いへの対応 ----
+
+import { unwrapEnvelope, createOpenXblClient } from '../lib/openxbl.js';
+import { extractTitles, countAchievements } from '../lib/minecraft.js';
+
+test('unwrapEnvelope: content を外す・文字列の JSON も読む・code>=400 はエラー', () => {
+  assert.deepEqual(unwrapEnvelope({ content: { a: 1 }, code: 200 }), { a: 1 });
+  assert.deepEqual(unwrapEnvelope({ content: '{"b":2}', code: 200 }), { b: 2 });
+  assert.deepEqual(unwrapEnvelope({ people: [], content: 'x' }), { people: [], content: 'x' }); // 包み紙ではない
+  assert.throws(() => unwrapEnvelope({ content: {}, code: 403 }), (e) => e.status === 403);
+});
+
+test('extractTitles: 入れ子の titles と、360形式の実績一覧の取り違え防止', () => {
+  const nested = { xuid: '1', data: { titles: [{ titleId: 2047319603, name: 'Minecraft for Nintendo Switch' }] } };
+  assert.equal(extractTitles(nested)[0].titleId, '2047319603');
+  assert.deepEqual(extractTitles({ achievements: [{ titleId: 1, unlocked: true }] }), []);
+});
+
+test('countAchievements: Xbox One 形式を数える', () => {
+  const json = {
+    achievements: [
+      { id: '1', progressState: 'Achieved', rewards: [{ type: 'Gamerscore', value: '20' }] },
+      { id: '2', progressState: 'NotStarted', rewards: [{ type: 'Gamerscore', value: '30' }] },
+      { id: '3', progressState: 'Achieved', rewards: [{ type: 'Gamerscore', value: '15' }] },
+    ],
+    pagingInfo: { continuationToken: 'x', totalRecords: 133 },
+  };
+  assert.deepEqual(countAchievements(json), { currentAchievements: 2, totalAchievements: 133, currentGamerscore: 35 });
+  assert.equal(countAchievements({ foo: [] }), null);
+});
+
+test('lookupGamertag: 最初の履歴が空なら予備の履歴を読み、実績はタイトルごとに数える', async () => {
+  const client = fakeClient({
+    // 実績一覧(タイトル単位ではない)が返る想定
+    getTitles: async () => ({ achievements: [{ id: '1', progressState: 'Achieved', titleAssociations: [{ id: 1 }] }] }),
+    // 実績の数が付いていない履歴
+    getTitleHistory: async () => ({ content: { titles: [{ titleId: '2047319603', name: 'Minecraft for Nintendo Switch', titleHistory: { lastTimePlayed: '2026-10-01T00:00:00Z' } }] } }),
+    getTitleAchievements: async () => ({
+      achievements: Array.from({ length: 133 }, (_, i) => ({ id: String(i), progressState: i < 67 ? 'Achieved' : 'NotStarted' })),
+    }),
+  });
+  const r = await lookupGamertag('TestPlayer', { client, debug: true });
+  assert.equal(r.history.visible, true);
+  assert.equal(r.history.source, 'player/titleHistory');
+  assert.equal(r.history.minecraft.titles[0].currentAchievements, 67);
+  assert.ok(Math.abs(r.history.minecraft.bestRate - 67 / 133) < 1e-12);
+  assert.equal(r.score.status, 'scored');
+  assert.deepEqual(client.calls, ['searchPlayers', 'getAccount', 'getTitles', 'getTitleHistory', 'getTitleAchievements', 'getStats']);
+  assert.equal(r.debug.titleSources.length, 2);
+});
+
+test('createOpenXblClient: captureRaw で受け取った応答をそのまま記録する', async () => {
+  const fetchImpl = async () => new Response(JSON.stringify({ content: { people: [{ xuid: '1' }] }, code: 200 }), { status: 200 });
+  const c = createOpenXblClient({ apiKey: 'k', fetchImpl, captureRaw: true });
+  const data = await c.searchPlayers('a#1');
+  assert.deepEqual(data, { people: [{ xuid: '1' }] }); // 呼び出し側には包み紙を外した値
+  assert.equal(c.rawLog.length, 1);
+  assert.equal(c.rawLog[0].path, '/search/a%231');
+  assert.deepEqual(c.rawLog[0].body, { content: { people: [{ xuid: '1' }] }, code: 200 }); // 記録は加工なし
+  const c2 = createOpenXblClient({ apiKey: 'k', fetchImpl });
+  await c2.searchPlayers('a');
+  assert.equal(c2.rawLog.length, 0);
 });

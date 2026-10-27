@@ -689,6 +689,21 @@ tr.total td {
   font-size: 0.8125rem;
 }
 
+.diagnostics p {
+  font-size: 0.8125rem;
+}
+
+.diagnostics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 8px;
+}
+
+.result > .diagnostics {
+  margin-top: 16px;
+}
+
 .diagnostics pre {
   margin: 10px 0 0;
   max-height: 360px;

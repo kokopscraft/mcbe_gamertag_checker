@@ -54,6 +54,7 @@ export async function onRequestGet({ request, env }) {
   const client = createOpenXblClient({
     apiKey: env.OPENXBL_API_KEY,
     baseUrl: env.OPENXBL_BASE || DEFAULT_OPENXBL_BASE,
+    captureRaw: debug,
   });
 
   try {
@@ -63,6 +64,8 @@ export async function onRequestGet({ request, env }) {
       debug,
     });
     const body = { ...result, fetchedAt: new Date().toISOString(), apiCalls: client.callCount };
+    // 診断時は、OpenXBL から受け取った応答を加工せずにすべて添える
+    if (debug) body.debug = { ...(body.debug ?? {}), raw: client.rawLog };
     if (env.CACHE && !debug) {
       try {
         await env.CACHE.put(cacheKey, JSON.stringify(body), { expirationTtl: cacheTtl(env) });
@@ -82,6 +85,7 @@ export async function onRequestGet({ request, env }) {
               upstreamBody: typeof e?.body === 'string' ? e.body.slice(0, 300) : JSON.stringify(e?.body ?? null).slice(0, 300),
               errorName: e?.name ?? null,
               errorMessage: String(e?.message ?? '').slice(0, 200),
+              raw: client.rawLog,
             },
           }
         : body;
