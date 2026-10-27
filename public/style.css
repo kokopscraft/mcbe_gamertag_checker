@@ -678,6 +678,33 @@ tr.total td {
   color: var(--muted);
 }
 
+.diagnostics {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--divider);
+  text-align: left;
+}
+
+.diagnostics .text-link {
+  font-size: 0.8125rem;
+}
+
+.diagnostics pre {
+  margin: 10px 0 0;
+  max-height: 360px;
+  overflow: auto;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
 .meta {
   display: flex;
   flex-wrap: wrap;

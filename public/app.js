@@ -59,25 +59,57 @@ function renderLoading(query) {
   resultEl.replaceChildren(h('p', { class: 'loading' }, `「${query}」を照会しています…`));
 }
 
-function renderError(message) {
+// 診断情報: 検索APIの応答の形を表示する(うまく見つからないときの原因調べ用)
+function renderDiagnostics(query) {
+  const box = h('div', { class: 'diagnostics' });
+  const button = h('button', {
+    type: 'button',
+    class: 'text-link',
+    onclick: async () => {
+      button.disabled = true;
+      button.textContent = '診断情報を取得中…';
+      try {
+        const params = new URLSearchParams({ gamertag: query, debug: '1' });
+        const res = await fetch(`/api/lookup?${params}`, { headers: { Accept: 'application/json' } });
+        const data = await res.json().catch(() => null);
+        const view = data
+          ? { status: res.status, searchedAs: data.searchedAs, found: data.found, error: data.error, debug: data.debug }
+          : { status: res.status, note: 'JSONではない応答でした' };
+        box.replaceChildren(
+          h('p', {}, '内容をコピーして共有すると、原因を調べやすくなります。'),
+          h('pre', {}, JSON.stringify(view, null, 2)));
+      } catch {
+        box.replaceChildren(h('p', {}, '診断情報を取得できませんでした。'));
+      }
+    },
+  }, '診断情報を表示');
+  box.append(button);
+  return box;
+}
+
+function renderError(message, query) {
   resultEl.replaceChildren(
     h('div', { class: 'card message-card' },
       h('p', { class: 'eyebrow' }, 'Error'),
       h('h2', { class: 'error-title' }, '照会できませんでした'),
-      h('p', {}, message)));
+      h('p', {}, message),
+      query ? renderDiagnostics(query) : null));
 }
 
 function renderNotFound(data) {
+  const searched = (data.searchedAs ?? []).filter((t) => t !== data.query);
   const card = h('div', { class: 'card message-card' },
     h('p', { class: 'eyebrow' }, 'Not found'),
     h('h2', {}, data.query),
-    h('p', {}, 'このゲーマータグのアカウントは見つかりませんでした。'));
+    h('p', {}, 'このゲーマータグのアカウントは見つかりませんでした。'),
+    searched.length ? h('p', {}, `検索には「${searched.join('」「')}」を使いました。`) : null);
   if (data.candidates?.length) {
     card.append(
       h('p', {}, '似た名前のアカウント'),
       h('div', { class: 'candidates' },
         data.candidates.map((c) => h('button', { type: 'button', onclick: () => run(c) }, c))));
   }
+  card.append(renderDiagnostics(data.query));
   resultEl.replaceChildren(card, renderMeta(data));
 }
 
@@ -269,7 +301,7 @@ async function run(query, refresh = false) {
       data = null;
     }
     if (!res.ok || !data) {
-      renderError(data?.message ?? `サーバーがエラーを返しました(${res.status})。`);
+      renderError(data?.message ?? `サーバーがエラーを返しました(${res.status})。`, res.status === 400 ? null : q);
     } else if (!data.found) {
       renderNotFound(data);
     } else {

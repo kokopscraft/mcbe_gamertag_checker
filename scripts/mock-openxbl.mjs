@@ -44,6 +44,24 @@ const players = {
   },
 };
 
+// 新形式ゲーマータグの例: ModernTest#4202 は TestPlayer と同じ記録を持つ
+players.moderntest4202 = {
+  ...players.testplayer,
+  person: {
+    xuid: '2535400000004202',
+    gamertag: 'ModernTest4202',
+    modernGamertag: 'ModernTest',
+    modernGamertagSuffix: '4202',
+    uniqueModernGamertag: 'ModernTest#4202',
+    gamerScore: '3500',
+    xboxOneRep: 'GoodPlayer',
+  },
+};
+const modernPeople = [
+  { xuid: '2535400000000777', gamertag: 'ModernTest0777', modernGamertag: 'ModernTest', modernGamertagSuffix: '0777', uniqueModernGamertag: 'ModernTest#0777' },
+  players.moderntest4202.person,
+];
+
 function send(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(body));
@@ -60,6 +78,12 @@ const server = http.createServer((req, res) => {
     if ((m = /^\/search\/(.+)$/.exec(path))) {
       const q = m[1].toLowerCase();
       if (q === 'ratelimited') return send(res, 429, { error: 'Too Many Requests' });
+      // 本物と同じく「#」付きのままでは見つからない想定
+      if (q.includes('#')) return send(res, 200, { people: [] });
+      if (q === 'moderntest') {
+        // 新形式(名前#番号)の同名アカウントが複数いる想定。応答を入れ子にして形の違いも試す
+        return send(res, 200, { content: { people: modernPeople }, code: 200 });
+      }
       const exact = players[q];
       const people = exact ? [exact.person] : [{ xuid: '2535400000000099', gamertag: `${m[1]}2`, gamerScore: '10' }];
       return send(res, 200, { people, recommendationSummary: null });

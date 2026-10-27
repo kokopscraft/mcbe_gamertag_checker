@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 
 import { computeScore, logRatio, reputationFactor } from '../lib/score.js';
 import { isBedrockTitle, summarizeMinecraft, extractMinutesPlayed } from '../lib/minecraft.js';
-import { lookupGamertag, validateGamertag, findExactMatch } from '../lib/lookup-core.js';
+import {
+  lookupGamertag,
+  validateGamertag,
+  findExactMatch,
+  searchTermsFor,
+  extractPeople,
+  summarizeSearch,
+} from '../lib/lookup-core.js';
 import { OpenXblError } from '../lib/openxbl.js';
 
 const mcTitle = (id, name, cur, total, gs, last) => ({
@@ -185,4 +192,77 @@ test('lookupGamertag: 履歴はあるが Minecraft なし', async () => {
   assert.equal(r.score.confidence, 'low');
   assert.ok(!client.calls.includes('getStats'));
   assert.ok(r.notes.some((n) => n.text.includes('PlayStation')));
+});
+
+// ---- #付き(新形式)ゲーマータグへの対応 ----
+
+const modernPeople = [
+  { xuid: '101', gamertag: 'sirokuru', modernGamertag: 'sirokuru', modernGamertagSuffix: '', uniqueModernGamertag: 'sirokuru' },
+  { xuid: '202', gamertag: 'sirokuru4202', modernGamertag: 'sirokuru', modernGamertagSuffix: '4202', uniqueModernGamertag: 'sirokuru#4202' },
+  { xuid: '303', gamertag: 'sirokuru1111', modernGamertag: 'sirokuru', modernGamertagSuffix: '1111', uniqueModernGamertag: 'sirokuru#1111' },
+];
+
+test('searchTermsFor: #付きは名前だけ、末尾数字は名前でも再検索', () => {
+  assert.deepEqual(searchTermsFor('sirokuru#4202'), ['sirokuru']);
+  assert.deepEqual(searchTermsFor('sirokuru4202'), ['sirokuru4202', 'sirokuru']);
+  assert.deepEqual(searchTermsFor('Steve'), ['Steve']);
+  assert.deepEqual(searchTermsFor('12345'), ['12345']);
+});
+
+test('findExactMatch: 新形式の名前を番号で特定する', () => {
+  assert.equal(findExactMatch(modernPeople, 'sirokuru#4202').match.xuid, '202');
+  assert.equal(findExactMatch(modernPeople, 'SIROKURU#4202').match.xuid, '202');
+  assert.equal(findExactMatch(modernPeople, 'sirokuru4202').match.xuid, '202');
+  // 番号なしは、番号を持たない本人を優先(同名が複数ある旨も返す)
+  const r = findExactMatch(modernPeople, 'sirokuru');
+  assert.equal(r.match.xuid, '101');
+  assert.equal(r.ambiguous.length, 3);
+  assert.equal(findExactMatch(modernPeople, 'sirokuru#9999').match, null);
+});
+
+test('extractPeople: 入れ子の形や id でも拾う', () => {
+  assert.equal(extractPeople({ people: modernPeople }).length, 3);
+  assert.equal(extractPeople({ content: { people: modernPeople } }).length, 3);
+  assert.equal(extractPeople({ data: [{ id: '9', gamertag: 'X' }] })[0].xuid, '9');
+  assert.deepEqual(extractPeople(null), []);
+  assert.deepEqual(extractPeople({ error: 'nope' }), []);
+});
+
+test('summarizeSearch: 形の要約', () => {
+  const s = summarizeSearch({ content: { people: modernPeople }, code: 200 });
+  assert.deepEqual(s.topLevelKeys, ['content', 'code']);
+  assert.equal(s.peopleCount, 3);
+  assert.equal(s.samples[1].uniqueModernGamertag, 'sirokuru#4202');
+  assert.equal(summarizeSearch(null).peopleCount, 0);
+  assert.equal(summarizeSearch({ error: 'Invalid key' }).errorText, 'Invalid key');
+});
+
+test('lookupGamertag: 「名前#番号」は名前で検索して見つける', async () => {
+  const terms = [];
+  const client = fakeClient({
+    searchPlayers: async (t) => {
+      terms.push(t);
+      return t === 'sirokuru' ? { people: modernPeople } : { people: [] };
+    },
+  });
+  const r = await lookupGamertag('sirokuru#4202', { client, debug: true });
+  assert.equal(r.found, true);
+  assert.equal(r.profile.xuid, '202');
+  assert.deepEqual(terms, ['sirokuru']);
+  assert.equal(r.debug.searches[0].peopleCount, 3);
+});
+
+test('lookupGamertag: 「名前番号」で見つからなければ名前で再検索', async () => {
+  const terms = [];
+  const client = fakeClient({
+    searchPlayers: async (t) => {
+      terms.push(t);
+      return t === 'sirokuru' ? { content: { people: modernPeople } } : { people: [] };
+    },
+  });
+  const r = await lookupGamertag('sirokuru4202', { client });
+  assert.equal(r.found, true);
+  assert.equal(r.profile.xuid, '202');
+  assert.deepEqual(terms, ['sirokuru4202', 'sirokuru']);
+  assert.deepEqual(r.searchedAs, ['sirokuru4202', 'sirokuru']);
 });
