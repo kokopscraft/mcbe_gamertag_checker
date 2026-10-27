@@ -53,6 +53,7 @@ players.moderntest4202 = {
     modernGamertag: 'ModernTest',
     modernGamertagSuffix: '4202',
     uniqueModernGamertag: 'ModernTest#4202',
+    realName: 'テスト 太郎',
     gamerScore: '3500',
     xboxOneRep: 'GoodPlayer',
   },

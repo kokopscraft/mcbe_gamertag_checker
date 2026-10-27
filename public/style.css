@@ -301,10 +301,62 @@ h3 {
   flex: none;
   width: 20px;
   height: 20px;
-  fill: none;
-  stroke: var(--muted);
-  stroke-width: 2;
-  stroke-linecap: round;
+  color: var(--muted);
+}
+
+/* アイコン(Lucide) */
+.icon {
+  flex: none;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon-badge {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--teal) 16%, transparent);
+  color: var(--teal-ink);
+}
+
+.icon-badge .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-badge.platform {
+  background: color-mix(in srgb, var(--purple) 13%, transparent);
+  color: var(--purple);
+}
+
+.icon-badge.danger {
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
+  color: var(--danger);
+}
+
+.icon-badge.plain {
+  background: transparent;
+  color: var(--ink-strong);
+}
+
+.chip .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.text-link .icon {
+  width: 14px;
+  height: 14px;
 }
 
 .search input {
@@ -444,7 +496,9 @@ summary:focus-visible {
 }
 
 .chip {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 1px 9px;
   border: 1px solid currentColor;
   border-radius: 2px;
@@ -548,6 +602,9 @@ summary:focus-visible {
 }
 
 .notes li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   padding: 12px 16px;
   border-left: 3px solid var(--teal);
   background: color-mix(in srgb, var(--teal) 7%, transparent);
@@ -556,6 +613,21 @@ summary:focus-visible {
 
 .notes li + li {
   margin-top: 8px;
+}
+
+.notes .icon {
+  width: 18px;
+  height: 18px;
+  margin-top: 0.2em;
+  color: var(--teal-ink);
+}
+
+.notes li.note-caution .icon {
+  color: var(--caution);
+}
+
+.notes li.note-danger .icon {
+  color: var(--danger);
 }
 
 .notes li.note-caution {
@@ -619,6 +691,133 @@ th.num {
 
 td.missing {
   color: var(--muted);
+}
+
+.cell-sub {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: normal;
+}
+
+/* スマホ幅: 結果の表を「名前と数値」「補足」の2段に組み替える */
+@media (max-width: 560px) {
+  .breakdown-table thead,
+  .platform-table thead {
+    display: none;
+  }
+
+  .breakdown-table tr,
+  .platform-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 4px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+
+  .breakdown-table tbody tr:last-child,
+  .platform-table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .breakdown-table td,
+  .breakdown-table th,
+  .platform-table td {
+    display: block;
+    padding: 0;
+    border: none;
+  }
+
+  /* 1段目: 項目名 | 得点 */
+  .breakdown-table tr > :nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  .breakdown-table tr > :nth-child(4) {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    font-weight: 700;
+    color: var(--ink-strong);
+  }
+
+  /* 2段目: 値 | 配点 */
+  .breakdown-table tr > :nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+    padding-left: 40px;
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+
+  .breakdown-table tr > :nth-child(3) {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .breakdown-table tbody tr:not(.total) > td:nth-child(3):not(:empty)::before {
+    content: "配点 ";
+  }
+
+  .breakdown-table tr.total > :nth-child(2),
+  .breakdown-table tr.total > :nth-child(3) {
+    display: none;
+  }
+
+  .breakdown-table tr.total th,
+  .breakdown-table tr.total td {
+    border-top: none;
+  }
+
+  /* 機種: 1段目 機種名 | 達成率、2段目 プレイ時間 | 最終プレイ */
+  .platform-table tr > :nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+    white-space: nowrap;
+  }
+
+  .platform-table tr > :nth-child(2) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    font-weight: 700;
+    color: var(--ink-strong);
+  }
+
+  .platform-table tr > :nth-child(3) {
+    grid-column: 1;
+    grid-row: 2;
+    padding-left: 40px;
+    font-size: 0.8125rem;
+    color: var(--muted);
+    text-align: left;
+  }
+
+  .platform-table tr > :nth-child(3)::before {
+    content: "プレイ時間 ";
+  }
+
+  .platform-table tr > :nth-child(4) {
+    grid-column: 1;
+    grid-row: 3;
+    padding-left: 40px;
+    font-size: 0.8125rem;
+    color: var(--muted);
+    text-align: left;
+  }
+
+  .platform-table tr > :nth-child(4)::before {
+    content: "最終プレイ ";
+  }
+
+  .platform-table .cell-sub {
+    font-weight: 400;
+  }
 }
 
 tr.total th,

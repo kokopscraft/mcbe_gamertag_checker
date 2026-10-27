@@ -11,7 +11,7 @@ Xboxのデータは非公式APIの [OpenXBL](https://xbl.io) から取得しま�
 ## ファイル構成
 
 ```
-public/            画面(index.html / style.css / app.js)
+public/            画面(index.html / style.css / app.js / icons.js)
 functions/
   _middleware.js   サイト全体のBasic認証
   api/lookup.js    GET /api/lookup?gamertag=... の本体(キャッシュとエラー処理)
@@ -22,7 +22,14 @@ lib/
   score.js         安全度の計算(重みはここで調整)
 test/              ロジックのテスト
 scripts/mock-openxbl.mjs  ローカル確認用の偽OpenXBLサーバー
+scripts/build-icons.mjs   使うアイコンだけを public/icons.js にまとめるスクリプト
 ```
+
+### アイコンについて
+
+画面のアイコンは [Lucide](https://lucide.dev)(ISCライセンス)です。使う分だけを `public/icons.js` に入れてあるので、外部への読み込みはありません。機種はブランドのロゴではなく、一般的な形(PCはモニター、Xboxはゲームパッド、Switchは十字キー、モバイルはスマホ)で表しています。
+
+アイコンを増やすときは、`scripts/build-icons.mjs` の `ICONS` にLucideのアイコン名を足して `npm install` → `npm run icons` を実行し、できた `public/icons.js` をコミットしてください。
 
 ## 1. OpenXBLのAPIキーを取る
 
@@ -84,6 +91,7 @@ npx wrangler kv namespace create CACHE
 | Minecraftのプレイ時間(取得できた機種の合計) | 30 | 100時間 |
 | アカウント全体のゲーマースコア | 20 | 10,000 |
 
+- 実績達成率は「獲得ゲーマースコア ÷ 満点のゲーマースコア」で計算します(Xboxアプリの%表示と同じ)。APIは機種ごとの実績の総数を0で返すため、満点が自動で追従するゲーマースコアの割合を使っています。満点が取れないときだけ「解除数 ÷ 133個」で代用します。
 - プレイ時間とゲーマースコアは対数の目盛りで換算します(序盤ほど点が伸びやすい)。
 - 取得できなかった項目は、残りの項目で配点を按分します。
 - Xboxの評判が `NeedsWork` なら×0.7、`AvoidMe` なら×0.4の補正をかけます。
@@ -106,6 +114,7 @@ npx wrangler kv namespace create CACHE
 - `名前#1234` 形式のゲーマータグは、`#` より前の名前で検索し、番号で本人を特定します。`名前1234` と入力した場合も、見つからなければ名前だけで検索し直します。
 - 「見つかりませんでした」の画面にある「診断情報を表示」を押すと、検索に使った語と、OpenXBLの応答の形(件数・項目名・先頭5件の名前)が表示されます。原因を調べるときは、この内容を見てください。
 - 同じ内容は `/api/lookup?gamertag=名前%23番号&debug=1` を開いても確認できます(`%23` は `#` のこと)。診断のときは保存済みの結果を使いません。
+- 診断情報の `raw` には、OpenXBLから受け取った応答がすべて入ります。ただし本名(`realName`、設定値の `RealName` / `RealNameOverride`、ゲーマータグと異なる `displayName`)は `######` に置き換えています。空欄のものはそのままです。
 
 ## 8. ローカルで試す
 

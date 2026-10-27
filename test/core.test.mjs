@@ -79,7 +79,8 @@ test('summarizeMinecraft: 機種別の最大達成率と最終プレイ', () => 
   ]);
   assert.equal(s.titles.length, 2);
   assert.equal(s.bestTitleId, '1739947436');
-  assert.ok(Math.abs(s.bestRate - 40 / 133) < 1e-12);
+  assert.ok(Math.abs(s.bestRate - 900 / 2980) < 1e-12);
+  assert.equal(s.titles[0].rateBasis, 'gamerscore');
   assert.equal(s.minecraftGamerscore, 1100);
   assert.equal(s.lastPlayed, '2026-10-01T00:00:00Z');
 });
@@ -139,7 +140,7 @@ test('lookupGamertag: 通常の照会', async () => {
   const r = await lookupGamertag('TestPlayer', { client });
   assert.equal(r.found, true);
   assert.equal(r.playtime.minutes, 3600);
-  assert.equal(r.score.score, 59);
+  assert.equal(r.score.score, 60); // 達成率 900/2980 で 59.54 → 60(Pythonで検算)
   assert.deepEqual(client.calls, ['searchPlayers', 'getAccount', 'getTitles', 'getStats']);
 });
 
@@ -334,4 +335,88 @@ test('createOpenXblClient: captureRaw で受け取った応答をそのまま記
   const c2 = createOpenXblClient({ apiKey: 'k', fetchImpl });
   await c2.searchPlayers('a');
   assert.equal(c2.rawLog.length, 0);
+});
+
+test('実データの形: Launcher と Preview は数えず、Windows と Switch だけ集計する', () => {
+  const ach = (cur, gs) => ({ currentAchievements: cur, totalAchievements: 0, currentGamerscore: gs, totalGamerscore: gs ? 2980 : 0 });
+  const titles = [
+    { titleId: '896928775', name: 'Minecraft for Windows', devices: ['PC'], achievement: ach(15, 225) },
+    { titleId: '1904044383', name: 'Minecraft Preview for Windows', devices: ['PC'], achievement: ach(0, 0) },
+    { titleId: '1794566092', name: 'Minecraft Launcher', devices: ['PC'], achievement: ach(0, 0) },
+    { titleId: '2047319603', name: 'Minecraft for Nintendo Switch', devices: ['Nintendo Switch'], achievement: ach(67, 1470) },
+  ];
+  const s = summarizeMinecraft(titles);
+  assert.deepEqual(s.titles.map((t) => t.titleId), ['2047319603', '896928775']);
+  assert.deepEqual(s.titles.map((t) => t.platform), ['Nintendo Switch', 'Windows']);
+  assert.ok(Math.abs(s.bestRate - 1470 / 2980) < 1e-12);
+  assert.equal(s.minecraftGamerscore, 1695);
+});
+
+// ---- 達成率の根拠と本名の伏せ字 ----
+
+import { achievementRateOf } from '../lib/minecraft.js';
+import { maskRealNames, maskRealNamesInText, MASK } from '../lib/openxbl.js';
+
+test('achievementRateOf: 満点GSがあればGSの割合、なければ解除数', () => {
+  assert.deepEqual(achievementRateOf({ currentGamerscore: 1470, totalGamerscore: 2980, currentAchievements: 67, totalAchievements: 0 }), { rate: 1470 / 2980, basis: 'gamerscore' });
+  assert.deepEqual(achievementRateOf({ currentGamerscore: 0, totalGamerscore: 0, currentAchievements: 67, totalAchievements: 0 }), { rate: 67 / 133, basis: 'count' });
+  assert.deepEqual(achievementRateOf({ currentAchievements: 10, totalAchievements: 20 }), { rate: 0.5, basis: 'count' });
+});
+
+test('countAchievements: 一覧が揃っていれば満点GSも数え、GSの割合が使われる', () => {
+  const list = { achievements: [
+    { progressState: 'Achieved', rewards: [{ type: 'Gamerscore', value: '30' }] },
+    { progressState: 'NotStarted', rewards: [{ type: 'Gamerscore', value: '70' }] },
+  ] };
+  const c = countAchievements(list);
+  assert.equal(c.totalGamerscore, 100);
+  assert.equal(achievementRateOf(c).rate, 0.3);
+  // 分割されていて揃っていなければ満点GSは付けない
+  assert.equal(countAchievements({ ...list, pagingInfo: { totalRecords: 133 } }).totalGamerscore, undefined);
+});
+
+test('maskRealNames: 実際の応答の形で本名だけを伏せる(元データは変えない)', () => {
+  const raw = {
+    content: {
+      people: [{ xuid: '1', displayName: null, realName: '山田 太郎', gamertag: 'yamada1234', uniqueModernGamertag: 'yamada#1234' }],
+      profileUsers: [{ id: '1', settings: [
+        { id: 'Gamertag', value: 'yamada1234' },
+        { id: 'RealName', value: '' },
+        { id: 'RealNameOverride', value: '山田 太郎' },
+        { id: 'Location', value: 'Tokyo / Japan' },
+      ] }],
+    },
+    code: 200,
+  };
+  const m = maskRealNames(raw);
+  assert.equal(m.content.people[0].realName, MASK);
+  assert.equal(m.content.people[0].gamertag, 'yamada1234');
+  assert.equal(m.content.people[0].displayName, null);
+  const settings = Object.fromEntries(m.content.profileUsers[0].settings.map((x) => [x.id, x.value]));
+  assert.equal(settings.RealNameOverride, MASK);
+  assert.equal(settings.RealName, ''); // 空欄はそのまま
+  assert.equal(settings.Gamertag, 'yamada1234');
+  assert.equal(settings.Location, 'Tokyo / Japan');
+  assert.equal(raw.content.people[0].realName, '山田 太郎'); // 元データは不変
+  assert.ok(!JSON.stringify(m).includes('山田'));
+});
+
+test('maskRealNames: ゲーマータグと異なる displayName は伏せ、同じなら残す', () => {
+  assert.equal(maskRealNames({ gamertag: 'Steve', displayName: '佐藤 花子' }).displayName, MASK);
+  assert.equal(maskRealNames({ gamertag: 'Steve', displayName: 'steve' }).displayName, 'steve');
+});
+
+test('maskRealNamesInText: 途中で切れた文字列でも伏せる', () => {
+  const t = '{"people":[{"realName":"山田 太郎","gamertag":"x"}],"settings":[{"id":"RealNameOverride","value":"山田 太郎"},{"id":"Bio","value":"hi"}';
+  const m = maskRealNamesInText(t);
+  assert.ok(!m.includes('山田'));
+  assert.ok(m.includes('"value":"hi"'));
+});
+
+test('createOpenXblClient: rawLog の本名は伏せ字、呼び出し側には本来の値', async () => {
+  const fetchImpl = async () => new Response(JSON.stringify({ content: { people: [{ xuid: '1', gamertag: 'a', realName: '山田 太郎' }] }, code: 200 }), { status: 200 });
+  const c = createOpenXblClient({ apiKey: 'k', fetchImpl, captureRaw: true });
+  const data = await c.searchPlayers('a');
+  assert.equal(data.people[0].realName, '山田 太郎');
+  assert.equal(c.rawLog[0].body.content.people[0].realName, MASK);
 });

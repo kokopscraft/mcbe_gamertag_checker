@@ -1,5 +1,40 @@
 // 画面側の処理。サーバー(/api/lookup)の結果を表示するだけで、API キーは持ちません。
 
+import { icon, hydrateIcons } from './icons.js';
+
+hydrateIcons();
+
+// 内訳の項目ごとのアイコン
+const PART_ICONS = { achievements: 'trophy', playtime: 'clock', gamerscore: 'award' };
+
+// 機種のアイコン(ブランドのロゴではなく一般的な形)
+const PLATFORM_ICONS_BY_ID = {
+  1828326430: 'gamepad-2', // Xbox
+  896928775: 'monitor', // Windows
+  1739947436: 'smartphone', // モバイル
+  2047319603: 'gamepad-directional', // Nintendo Switch
+};
+
+function platformIcon(t) {
+  const byId = PLATFORM_ICONS_BY_ID[t.titleId];
+  if (byId) return byId;
+  const text = `${(t.devices ?? []).join(' ')} ${t.name ?? ''}`;
+  if (/xbox/i.test(text)) return 'gamepad-2';
+  if (/switch|nintendo/i.test(text)) return 'gamepad-directional';
+  if (/android|ios|iphone|ipad|mobile|pocket/i.test(text)) return 'smartphone';
+  if (/\bpc\b|win/i.test(text)) return 'monitor';
+  return 'gamepad';
+}
+
+const NOTE_ICONS = { info: 'info', caution: 'triangle-alert', danger: 'octagon-alert' };
+
+// アイコンの丸い下地 + 文字
+function withBadge(iconName, text, variant = '') {
+  return h('span', { class: 'item' },
+    h('span', { class: `icon-badge ${variant}`.trim() }, icon(iconName)),
+    h('span', {}, text));
+}
+
 const form = document.getElementById('lookup-form');
 const input = document.getElementById('gamertag');
 const submit = document.getElementById('submit');
@@ -41,6 +76,14 @@ function formatDate(iso, withTime = false) {
 }
 
 const pct = (x, digits = 1) => `${(x * 100).toFixed(digits)}%`;
+
+// 達成率の根拠(ゲーマースコアの割合か、解除数か)
+function rateDetail(t) {
+  if (t.rateBasis === 'gamerscore') {
+    return `${nf.format(t.currentGamerscore)} / ${nf.format(t.totalGamerscore)} G`;
+  }
+  return `解除 ${t.currentAchievements} / ${t.totalAchievements}個`;
+}
 
 const CONFIDENCE = {
   high: { chip: '信頼度 高', text: '3項目すべてを取得できました。' },
@@ -92,7 +135,7 @@ function renderDiagnostics(query) {
           },
         }, '全文をコピー');
         box.replaceChildren(
-          h('p', {}, `HTTP ${res.status}。「raw」にOpenXBLから受け取った応答がすべて入っています。検索結果にはほかのプレイヤーの名前も含まれるので、共有するときは注意してください。`),
+          h('p', {}, `HTTP ${res.status}。「raw」にOpenXBLから受け取った応答がすべて入っています(本名は ###### に置き換え済み)。検索結果にはほかのプレイヤーのゲーマータグも含まれるので、共有するときは注意してください。`),
           h('div', { class: 'diagnostics-actions' },
             copy,
             h('a', { class: 'text-link', href: apiUrl, target: '_blank', rel: 'noopener' }, '別のタブで開く')),
@@ -101,7 +144,7 @@ function renderDiagnostics(query) {
         box.replaceChildren(h('p', {}, '診断情報を取得できませんでした。'));
       }
     },
-  }, '診断情報を表示');
+  }, icon('bug'), '診断情報を表示');
   box.append(button);
   return box;
 }
@@ -145,8 +188,10 @@ function renderIdentity(data) {
     avatar,
     h('div', {},
       h('div', { class: 'chips' },
-        h('span', { class: 'chip' }, 'アカウントあり'),
-        p.reputation ? h('span', { class: `chip ${repBad ? 'danger' : 'muted'}` }, p.reputation) : null),
+        h('span', { class: 'chip' }, icon('user-round-check'), 'アカウントあり'),
+        p.reputation
+          ? h('span', { class: `chip ${repBad ? 'danger' : 'muted'}` }, icon(repBad ? 'shield-alert' : 'shield-check'), p.reputation)
+          : null),
       h('h2', {}, name),
       h('p', { class: 'sub' }, sub.join('、'))));
 }
@@ -167,7 +212,7 @@ function renderVerdict(score) {
     h('div', { class: 'score-number', 'aria-label': `安全度 ${score.score}パーセント` },
       String(score.score), h('span', { class: 'unit', 'aria-hidden': 'true' }, '%')),
     h('div', { class: 'verdict-text' },
-      h('div', { class: 'chips' }, h('span', { class: 'chip muted' }, conf.chip)),
+      h('div', { class: 'chips' }, h('span', { class: 'chip muted' }, icon('gauge'), conf.chip)),
       h('div', { class: 'band' }, `安全度 ${score.band.label}`),
       h('p', { class: 'confidence' }, conf.text)),
     h('div', { class: 'meter', role: 'img', 'aria-label': `10段階中${Math.round(score.score / 10)}段階` }, segments));
@@ -176,7 +221,7 @@ function renderVerdict(score) {
 function renderNotes(data) {
   if (!data.notes?.length) return null;
   return h('ul', { class: 'notes' },
-    data.notes.map((n) => h('li', { class: `note-${n.tone}` }, n.text)));
+    data.notes.map((n) => h('li', { class: `note-${n.tone}` }, icon(NOTE_ICONS[n.tone] ?? 'info'), h('span', {}, n.text))));
 }
 
 function partValue(part, data) {
@@ -185,7 +230,7 @@ function partValue(part, data) {
     if (!part.available) return null;
     const best = mc?.titles?.find((t) => t.titleId === mc.bestTitleId);
     if (!best) return 'Minecraftの記録なし';
-    return `${best.currentAchievements} / ${best.totalAchievements}(${pct(best.rate)})`;
+    return `${rateDetail(best)}(${pct(best.rate)})`;
   }
   if (part.key === 'playtime') {
     return part.available ? formatHours(data.playtime?.minutes) : null;
@@ -201,21 +246,21 @@ function renderBreakdown(data) {
   const rows = s.parts.map((part) => {
     const value = partValue(part, data);
     return h('tr', {},
-      h('td', {}, part.label),
+      h('td', {}, withBadge(PART_ICONS[part.key] ?? 'info', part.label)),
       h('td', { class: value == null ? 'missing' : '' }, value ?? '取得できず'),
       h('td', { class: 'num' }, part.effectiveWeight == null ? 'なし' : (part.effectiveWeight * 100).toFixed(1)),
       h('td', { class: 'num' }, part.contribution == null ? 'なし' : part.contribution.toFixed(1)));
   });
   if (s.status === 'scored' && s.reputationFactor !== 1) {
     rows.push(h('tr', {},
-      h('td', {}, 'Xboxの評判による補正'),
+      h('td', {}, withBadge('shield-alert', 'Xboxの評判による補正', 'danger')),
       h('td', {}, data.profile.reputation ?? ''),
       h('td', { class: 'num' }, ''),
       h('td', { class: 'num' }, `×${s.reputationFactor}`)));
   }
   if (s.status === 'scored') {
     rows.push(h('tr', { class: 'total' },
-      h('th', { scope: 'row' }, '合計'),
+      h('th', { scope: 'row' }, withBadge('sigma', '合計', 'plain')),
       h('td', {}, ''),
       h('td', { class: 'num' }, '100.0'),
       h('td', { class: 'num' }, String(s.score))));
@@ -224,7 +269,7 @@ function renderBreakdown(data) {
     sectionHeading('Breakdown', '内訳'),
     h('div', { class: 'card list-card' },
       h('div', { class: 'table-wrap' },
-        h('table', {},
+        h('table', { class: 'breakdown-table' },
           h('thead', {}, h('tr', {},
             h('th', { scope: 'col' }, '項目'),
             h('th', { scope: 'col' }, '値'),
@@ -241,18 +286,23 @@ function renderTitles(data) {
     sectionHeading('Platforms', '機種ごとのMinecraftの記録'),
     h('div', { class: 'card list-card' },
       h('div', { class: 'table-wrap' },
-        h('table', {},
+        h('table', { class: 'platform-table' },
           h('thead', {}, h('tr', {},
             h('th', { scope: 'col' }, '機種'),
-            h('th', { scope: 'col', class: 'num' }, '実績'),
+            h('th', { scope: 'col', class: 'num' }, '達成率'),
             h('th', { scope: 'col', class: 'num' }, 'プレイ時間'),
             h('th', { scope: 'col', class: 'num' }, '最終プレイ'))),
           h('tbody', {}, titles.map((t) => {
             const where = t.platform ?? (t.devices.length ? t.devices.join('、') : t.name);
             const minutes = perTitle[t.titleId];
+            const detail = t.rateBasis === 'gamerscore'
+              ? `${t.currentAchievements}個、${rateDetail(t)}`
+              : rateDetail(t);
             return h('tr', {},
-              h('td', { title: `${t.name}(タイトルID ${t.titleId})` }, where),
-              h('td', { class: 'num' }, `${t.currentAchievements} / ${t.totalAchievements}`),
+              h('td', { title: `${t.name}(タイトルID ${t.titleId})` }, withBadge(platformIcon(t), where, 'platform')),
+              h('td', { class: 'num' },
+                t.rate == null ? '取得できず' : pct(t.rate),
+                t.rate == null ? null : h('span', { class: 'cell-sub' }, detail)),
               h('td', { class: 'num' }, minutes != null ? formatHours(minutes) : '取得できず'),
               h('td', { class: 'num' }, formatDate(t.lastPlayed)));
           }))))));
@@ -264,7 +314,7 @@ function renderMeta(data) {
   else if (data.apiCalls != null) parts.push(`OpenXBLを${data.apiCalls}回呼び出し`);
   return h('div', { class: 'meta' },
     h('span', {}, parts.join('、')),
-    h('button', { type: 'button', class: 'text-link', onclick: () => run(data.query, true) }, '最新の情報で再取得'));
+    h('button', { type: 'button', class: 'text-link', onclick: () => run(data.query, true) }, icon('refresh-cw'), '最新の情報で再取得'));
 }
 
 function renderFound(data) {

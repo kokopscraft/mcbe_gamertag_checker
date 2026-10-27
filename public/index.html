@@ -39,7 +39,7 @@
       <form id="lookup-form" class="search" autocomplete="off" novalidate>
         <label for="gamertag" class="visually-hidden">ゲーマータグ</label>
         <div class="search-box">
-          <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+          <span class="search-icon" data-icon="search"></span>
           <input id="gamertag" name="gamertag" type="text" maxlength="32" spellcheck="false" autocapitalize="off" required
                  placeholder="ゲーマータグを入力" aria-describedby="gamertag-hint">
           <button id="submit" type="submit">照会する</button>
@@ -65,12 +65,13 @@
                 <table>
                   <thead><tr><th scope="col">項目</th><th scope="col" class="num">配点</th><th scope="col" class="num">満点の目安</th></tr></thead>
                   <tbody>
-                    <tr><td>Minecraftの実績達成率(最も進んでいる機種)</td><td class="num">50</td><td class="num">全実績を解除</td></tr>
-                    <tr><td>Minecraftのプレイ時間(機種の合計)</td><td class="num">30</td><td class="num">100時間</td></tr>
-                    <tr><td>アカウント全体のゲーマースコア</td><td class="num">20</td><td class="num">10,000</td></tr>
+                    <tr><td><span class="item"><span class="icon-badge"><span data-icon="trophy"></span></span><span>Minecraftの実績達成率(最も進んでいる機種)</span></span></td><td class="num">50</td><td class="num">全実績を解除</td></tr>
+                    <tr><td><span class="item"><span class="icon-badge"><span data-icon="clock"></span></span><span>Minecraftのプレイ時間(機種の合計)</span></span></td><td class="num">30</td><td class="num">100時間</td></tr>
+                    <tr><td><span class="item"><span class="icon-badge"><span data-icon="award"></span></span><span>アカウント全体のゲーマースコア</span></span></td><td class="num">20</td><td class="num">10,000</td></tr>
                   </tbody>
                 </table>
               </div>
+              <p>実績達成率は、獲得したゲーマースコアの割合で計算します(Xboxアプリの%表示と同じ)。統合版の実績は機種ごとに別々に記録されるので、最も進んでいる機種の値を使います。</p>
               <p>プレイ時間とゲーマースコアは、序盤ほど点が伸びやすい対数の目盛りで換算します。</p>
             </div>
           </div>
