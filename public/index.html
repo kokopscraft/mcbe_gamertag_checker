@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>ゲーマータグ照会</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="bg-deco" aria-hidden="true">
+    <svg viewBox="0 0 1440 1000" preserveAspectRatio="xMidYMid slice">
+      <circle class="deco-teal" cx="1160" cy="210" r="390" />
+      <path class="deco-pink" d="M 40 300 A 520 520 0 0 1 600 290" />
+      <path class="deco-pink-thin" d="M 1020 560 A 470 470 0 0 1 1100 1060" />
+      <line class="deco-line" x1="0" y1="390" x2="1440" y2="140" />
+    </svg>
+  </div>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"></span>
+        ゲーマータグ照会
+      </a>
+      <a class="header-link" href="#method">計算方法</a>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <p class="eyebrow">Gamertag Check</p>
+      <h1>ゲーマータグ照会</h1>
+      <p class="lede">統合版のゲーマータグから、アカウントがあるかどうかと、やり込み度にもとづく安全度の目安を調べます。</p>
+
+      <form id="lookup-form" class="search" autocomplete="off" novalidate>
+        <label for="gamertag" class="visually-hidden">ゲーマータグ</label>
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+          <input id="gamertag" name="gamertag" type="text" maxlength="32" spellcheck="false" autocapitalize="off" required
+                 placeholder="ゲーマータグを入力" aria-describedby="gamertag-hint">
+          <button id="submit" type="submit">照会する</button>
+        </div>
+        <p id="gamertag-hint" class="hint">#付きの新しいゲーマータグも、そのまま入力できます。</p>
+      </form>
+    </section>
+
+    <div id="result" class="result" aria-live="polite"></div>
+
+    <section id="method" class="method">
+      <p class="eyebrow">How it works</p>
+      <h2 class="section-title">安全度の計算方法</h2>
+
+      <div class="qa">
+        <article class="qa-card">
+          <h3><span class="qa-mark">Q.</span>何をもとに計算していますか？</h3>
+          <div class="qa-answer">
+            <span class="qa-mark a">A.</span>
+            <div>
+              <p>次の3項目を合計して、0〜100%で表します。取れなかった項目は、残りの項目で配点を按分します。</p>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th scope="col">項目</th><th scope="col" class="num">配点</th><th scope="col" class="num">満点の目安</th></tr></thead>
+                  <tbody>
+                    <tr><td>Minecraftの実績達成率(最も進んでいる機種)</td><td class="num">50</td><td class="num">全実績を解除</td></tr>
+                    <tr><td>Minecraftのプレイ時間(機種の合計)</td><td class="num">30</td><td class="num">100時間</td></tr>
+                    <tr><td>アカウント全体のゲーマースコア</td><td class="num">20</td><td class="num">10,000</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p>プレイ時間とゲーマースコアは、序盤ほど点が伸びやすい対数の目盛りで換算します。</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="qa-card">
+          <h3><span class="qa-mark">Q.</span>Xboxの評判は反映されますか？</h3>
+          <div class="qa-answer">
+            <span class="qa-mark a">A.</span>
+            <p>評判が「NeedsWork」なら×0.7、「AvoidMe」なら×0.4の補正をかけます。</p>
+          </div>
+        </article>
+
+        <article class="qa-card">
+          <h3><span class="qa-mark">Q.</span>「判定不能」になるのはどんなときですか？</h3>
+          <div class="qa-answer">
+            <span class="qa-mark a">A.</span>
+            <p>ゲーム履歴が非公開、または空のときです。PlayStation版だけで遊ぶ人は実績がPSN側に記録されるため、判定はできても低く出ます。</p>
+          </div>
+        </article>
+
+        <article class="qa-card">
+          <h3><span class="qa-mark">Q.</span>この数値だけで参加を決めてもいいですか？</h3>
+          <div class="qa-answer">
+            <span class="qa-mark a">A.</span>
+            <p>やり込み度の目安なので、新しいアカウントの人は低く出ます。判断の材料のひとつとして使ってください。</p>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>管理者専用のツールです。Xboxのデータは非公式APIのOpenXBLから取得しています。</p>
+  </footer>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

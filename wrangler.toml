@@ -1,0 +1,14 @@
+name = "mc-gamertag-checker"
+pages_build_output_dir = "public"
+compatibility_date = "2026-10-01"
+
+[vars]
+# 結果を保存しておく秒数(KV を使う場合のみ有効。最小 60)
+CACHE_TTL_SECONDS = "3600"
+# Basic 認証のユーザー名(パスワードは Secret の ADMIN_PASSWORD に入れる)
+ADMIN_USER = "admin"
+
+# 照会結果のキャッシュ(任意)。使う場合は README の手順で KV を作り、下の 3 行のコメントを外してください。
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "ここに KV の ID"

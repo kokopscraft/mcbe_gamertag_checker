@@ -1,0 +1,3 @@
+# ローカル開発用。このファイルを .dev.vars にコピーして値を入れてください(.dev.vars は Git に入れない)。
+OPENXBL_API_KEY=ここにOpenXBLのAPIキー
+ADMIN_PASSWORD=ローカル用のパスワード
